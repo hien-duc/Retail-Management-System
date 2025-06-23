@@ -12,10 +12,12 @@ namespace Retail_Management_System.Controllers
     public class ProductController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IWebHostEnvironment _webHostEnvironment;
 
-        public ProductController(ApplicationDbContext context)
+        public ProductController(ApplicationDbContext context, IWebHostEnvironment webHostEnvironment)
         {
             _context = context;
+            _webHostEnvironment = webHostEnvironment;
         }
 
         // GET: Product
@@ -97,10 +99,15 @@ namespace Retail_Management_System.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Roles = "Admin,Manager")] // Only Admin and Manager can access
-        public async Task<IActionResult> Create([Bind("ProductCode,ProductName,Description,SKU,CategoryID,Price,CostPrice,StockQuantity,ProductImage,IsActive")] Product product)
+        public async Task<IActionResult> Create([Bind("ProductCode,ProductName,Description,SKU,CategoryID,Price,CostPrice,StockQuantity,ProductImage,IsActive")] Product product, IFormFile? productImg)
         {
             if (ModelState.IsValid)
             {
+                // Handle cover image upload
+                if (productImg != null && productImg.Length > 0)
+                {
+                    product.ProductImage = await UploadFile(productImg, "images/products");
+                }
                 product.CreatedDate = DateTime.Now;
                 product.Status = 1; // Active status
                 _context.Add(product);
@@ -133,7 +140,7 @@ namespace Retail_Management_System.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize(Roles = "Admin,Manager")] // Only Admin and Manager can access
-        public async Task<IActionResult> Edit(int id, [Bind("Id,ProductCode,ProductName,Description,SKU,CategoryID,Price,CostPrice,StockQuantity,ProductImage,IsActive,Status,CreatedDate")] Product product)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,ProductCode,ProductName,Description,SKU,CategoryID,Price,CostPrice,StockQuantity,ProductImage,IsActive,Status,CreatedDate")] Product product, IFormFile? productImg)
         {
             if (id != product.Id)
             {
@@ -142,6 +149,19 @@ namespace Retail_Management_System.Controllers
 
             if (ModelState.IsValid)
             {
+                
+                // Handle cover image upload if a new one is provided
+                if (productImg != null && productImg.Length > 0)
+                {
+                    // Delete old cover image if it exists
+                    if (!string.IsNullOrEmpty(product.ProductImage))
+                    {
+                        DeleteFile(product.ProductImage);
+                    }
+
+                    product.ProductImage = await UploadFile(productImg, "images/products");
+                }
+                
                 try
                 {
                     _context.Update(product);
@@ -203,6 +223,48 @@ namespace Retail_Management_System.Controllers
         private bool ProductExists(int id)
         {
             return _context.Products.Any(e => e.Id == id);
+        }
+        
+        private async Task<string> UploadFile(IFormFile file, string folderPath)
+        {
+            if (file == null || file.Length == 0)
+                return null;
+
+            // Create the directory if it doesn't exist
+            var uploadsFolder = Path.Combine(_webHostEnvironment.WebRootPath, folderPath);
+            if (!Directory.Exists(uploadsFolder))
+            {
+                Directory.CreateDirectory(uploadsFolder);
+            }
+
+            // Generate a unique file name
+            string uniqueFileName = $"{Guid.NewGuid().ToString()}_{Path.GetFileName(file.FileName)}";
+            string filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+            // Save the file
+            using (var fileStream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(fileStream);
+            }
+
+            // Return the relative path
+            return $"/{folderPath.Replace("\\", "/")}/{uniqueFileName}";
+        }
+
+        private void DeleteFile(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+                return;
+
+            // Convert the URL path to a physical file path
+            var relativePath = filePath.StartsWith('/') ? filePath.Substring(1) : filePath;
+            var fullPath = Path.Combine(_webHostEnvironment.WebRootPath, relativePath);
+
+            // Delete the file if it exists
+            if (System.IO.File.Exists(fullPath))
+            {
+                System.IO.File.Delete(fullPath);
+            }
         }
     }
 }

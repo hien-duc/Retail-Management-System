@@ -16,6 +16,7 @@
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                         <input type="hidden" asp-for="Id" />
                         <input type="hidden" asp-for="CreatedDate" />
+                        <input type="hidden" asp-for="Password" />
                         
                         <div class="mb-3">
                             <label asp-for="Username" class="form-label"></label>
@@ -25,7 +26,7 @@
                         
                         <div class="mb-3">
                             <label asp-for="Password" class="form-label"></label>
-                            <input asp-for="Password" class="form-control" type="password" />
+                            <input name="newPassword" class="form-control" type="password" />
                             <span asp-validation-for="Password" class="text-danger"></span>
                         </div>
                         
